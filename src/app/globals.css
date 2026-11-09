@@ -1,0 +1,92 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ডিফল্ট থিম: লাইট (html-এ .dark ক্লাস থাকলে ডার্ক) */
+:root {
+  color-scheme: light;
+}
+.dark {
+  color-scheme: dark;
+}
+
+body {
+  font-family: "Noto Sans Bengali", "Hind Siliguri", "SolaimanLipi", "Segoe UI",
+    system-ui, sans-serif;
+}
+
+@layer components {
+  /* 3D কার্ড — হালকা ছায়া আর হোভারে ভেসে ওঠে */
+  .card-3d {
+    @apply rounded-2xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900;
+    box-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.04),
+      0 8px 20px -8px rgba(0, 0, 0, 0.14);
+    transition:
+      transform 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+  .card-3d:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.06),
+      0 14px 28px -10px rgba(0, 0, 0, 0.2);
+  }
+
+  /* 3D বাটন — নিচে বেড আছে, চাপলে চেপে যায় */
+  .btn-3d {
+    @apply rounded-lg bg-primary font-medium text-white;
+    box-shadow:
+      0 3px 0 #166534,
+      0 6px 12px -4px rgba(22, 163, 74, 0.5);
+    transition:
+      transform 0.1s ease,
+      box-shadow 0.1s ease,
+      filter 0.15s ease;
+  }
+  .btn-3d:hover {
+    filter: brightness(1.06);
+  }
+  .btn-3d:active {
+    transform: translateY(3px);
+    box-shadow: 0 0 0 #166534;
+  }
+  .btn-3d:disabled {
+    opacity: 0.6;
+    transform: none;
+  }
+
+  /* গোস্ট (সেকেন্ডারি) 3D বাটন */
+  .btn-3d-ghost {
+    @apply rounded-lg border border-neutral-300 bg-white font-medium dark:border-neutral-700 dark:bg-neutral-900;
+    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.1);
+    transition:
+      transform 0.1s ease,
+      box-shadow 0.1s ease,
+      background-color 0.15s ease;
+  }
+  .btn-3d-ghost:hover {
+    @apply bg-neutral-100 dark:bg-neutral-800;
+  }
+  .btn-3d-ghost:active {
+    transform: translateY(3px);
+    box-shadow: 0 0 0 rgba(0, 0, 0, 0.1);
+  }
+
+  /* ইনপুট — ভেতরের ছায়াসহ হালকা 3D */
+  .input-3d {
+    @apply rounded-lg border border-neutral-300 bg-white outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-neutral-700 dark:bg-neutral-900;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+
+  /* ছোট বাটনে চাপা ইফেক্ট */
+  .btn-press:active {
+    transform: translateY(1px);
+  }
+
+  /* সাইডবারের সক্রিয় লিংক */
+  .nav-active-3d {
+    @apply rounded-lg bg-primary text-white;
+    box-shadow: 0 3px 0 #166534;
+  }
+}
