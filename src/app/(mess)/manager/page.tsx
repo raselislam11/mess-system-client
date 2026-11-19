@@ -52,7 +52,14 @@ export default function ManagerUsersPage() {
       ) : (
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
           {visible.map((member) => {
-            const remaining = member.takaGiven - member.mealTakaTotal;
+            const takaLeft =
+              member.takaGiven -
+              member.mealTakaTotal -
+              member.extraTakaShare;
+            const chalLeft =
+              member.chalGiven -
+              member.chalUsedTotal -
+              member.extraChalShare;
             return (
               <Link
                 key={member.memberId}
@@ -65,14 +72,44 @@ export default function ManagerUsersPage() {
                     {roleLabel(member.role as "controller" | "manager" | "member")}
                   </span>
                 </div>
-                <p className="mt-2 text-sm text-neutral-500">
-                  দিলো: <span className="font-medium text-neutral-800 dark:text-neutral-200">৳{member.takaGiven}</span>
-                </p>
-                <p
-                  className={`text-sm ${remaining < 0 ? "text-red-500" : "text-neutral-500"}`}
-                >
-                  বাকি: <span className="font-medium">৳{remaining}</span>
-                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {/* টাকা বক্স */}
+                  <div className="rounded-xl bg-neutral-100 p-3 dark:bg-neutral-800">
+                    <p className="text-xs text-neutral-500">টাকা</p>
+                    <p className="mt-1 text-sm">
+                      দিলো:{" "}
+                      <span className="font-medium text-neutral-800 dark:text-neutral-200">
+                        ৳{member.takaGiven}
+                      </span>
+                    </p>
+                    <p className="text-sm text-neutral-500">
+                      এক্সট্রা: −৳{member.extraTakaShare}
+                    </p>
+                    <p
+                      className={`text-sm ${takaLeft < 0 ? "text-red-500" : "text-neutral-500"}`}
+                    >
+                      বাকি: <span className="font-medium">৳{takaLeft}</span>
+                    </p>
+                  </div>
+                  {/* চাল বক্স */}
+                  <div className="rounded-xl bg-neutral-100 p-3 dark:bg-neutral-800">
+                    <p className="text-xs text-neutral-500">চাল</p>
+                    <p className="mt-1 text-sm">
+                      দিলো:{" "}
+                      <span className="font-medium text-neutral-800 dark:text-neutral-200">
+                        {member.chalGiven} পট
+                      </span>
+                    </p>
+                    <p className="text-sm text-neutral-500">
+                      এক্সট্রা: −{member.extraChalShare} পট
+                    </p>
+                    <p
+                      className={`text-sm ${chalLeft < 0 ? "text-red-500" : "text-neutral-500"}`}
+                    >
+                      বাকি: <span className="font-medium">{chalLeft} পট</span>
+                    </p>
+                  </div>
+                </div>
               </Link>
             );
           })}

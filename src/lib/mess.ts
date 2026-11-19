@@ -1,8 +1,10 @@
 import { api } from "./api";
 import type {
   BazarEntryData,
+  BazarListData,
   DailyEntryData,
   ExtraEntryData,
+  JorimanaData,
   Member,
   MonthInfo,
   MonthSummary,
@@ -34,6 +36,9 @@ export const createMonth = (label: string) =>
 
 export const closeMonth = (id: string) =>
   api<{ month: MonthInfo }>(`/months/${id}/close`, { method: "POST" });
+
+export const reopenMonth = (id: string) =>
+  api<{ month: MonthInfo }>(`/months/${id}/reopen`, { method: "POST" });
 
 export const getMonthSummary = (id: string) =>
   api<MonthSummary>(`/months/${id}/summary`);
@@ -73,8 +78,10 @@ export function upsertDailyEntry(
     takaGiven: number;
     takaNote?: string;
     mealTaka: number[];
+    mealNote?: string;
     chalGiven: number;
     chalUsed: number[];
+    chalNote?: string;
   }
 ) {
   return api<{ entry: DailyEntryData }>(`/months/${monthId}/daily`, {
@@ -103,6 +110,62 @@ export const addBazarEntry = (
 
 export const deleteBazarEntry = (monthId: string, entryId: string) =>
   api<{ message: string }>(`/months/${monthId}/bazar/${entryId}`, {
+    method: "DELETE",
+  });
+
+// Bazar list — কোন দিনে কারা বাজার করবে, কত টাকা, টিক মার্ক
+export const getBazarList = (monthId: string) =>
+  api<{ entries: BazarListData[] }>(`/months/${monthId}/bazar-list`);
+
+export const addBazarList = (
+  monthId: string,
+  body: { day: number; members: string[]; amount: number; done: boolean }
+) =>
+  api<{ entry: BazarListData }>(`/months/${monthId}/bazar-list`, {
+    method: "POST",
+    body,
+  });
+
+export const updateBazarList = (
+  monthId: string,
+  entryId: string,
+  body: { day: number; members: string[]; amount: number; done: boolean }
+) =>
+  api<{ entry: BazarListData }>(
+    `/months/${monthId}/bazar-list/${entryId}`,
+    { method: "PUT", body }
+  );
+
+export const deleteBazarList = (monthId: string, entryId: string) =>
+  api<{ message: string }>(`/months/${monthId}/bazar-list/${entryId}`, {
+    method: "DELETE",
+  });
+
+// জরিমানা — বাজার লিস্টের মতো, তবে একদিনে এক জন
+export const getJorimana = (monthId: string) =>
+  api<{ entries: JorimanaData[] }>(`/months/${monthId}/jorimana`);
+
+export const addJorimana = (
+  monthId: string,
+  body: { day: number; member: string | null; amount: number; done: boolean }
+) =>
+  api<{ entry: JorimanaData }>(`/months/${monthId}/jorimana`, {
+    method: "POST",
+    body,
+  });
+
+export const updateJorimana = (
+  monthId: string,
+  entryId: string,
+  body: { day: number; member: string | null; amount: number; done: boolean }
+) =>
+  api<{ entry: JorimanaData }>(`/months/${monthId}/jorimana/${entryId}`, {
+    method: "PUT",
+    body,
+  });
+
+export const deleteJorimana = (monthId: string, entryId: string) =>
+  api<{ message: string }>(`/months/${monthId}/jorimana/${entryId}`, {
     method: "DELETE",
   });
 

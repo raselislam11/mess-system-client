@@ -10,6 +10,11 @@ const config: Config = {
           DEFAULT: "#16a34a",
           dark: "#15803d",
         },
+        // Navbar ও Footer-এর স্ট্যান্ডার্ড রঙ (গাঢ় রঙ — টেক্সট সাদা হবে)
+        brand: {
+          DEFAULT: "#1E293B",
+          dark: "#15202F",
+        },
       },
     },
   },

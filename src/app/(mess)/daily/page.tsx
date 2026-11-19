@@ -40,13 +40,13 @@ function toRow(
       hasExisting: false,
     };
   }
-  const mealTotal =
-    entry.mealTaka[0] + entry.mealTaka[1] + entry.mealTaka[2];
+  // এই দিনের ডেটা আগেই লেখা থাকলেও বক্সে আর দেখানো হয় না —
+  // লুকানো takaGiven/chalGiven রাখা হয় যাতে সেভ করলে হারিয়ে না যায়
   return {
     memberId,
     name,
-    mealTaka: mealTotal ? String(mealTotal) : "",
-    chalUsed: entry.chalUsed.map(String) as [string, string, string],
+    mealTaka: "",
+    chalUsed: ["", "", ""],
     takaGiven: String(entry.takaGiven),
     chalGiven: String(entry.chalGiven),
     hasExisting: true,
@@ -63,6 +63,17 @@ export default function DailyPage() {
   const [confirmRow, setConfirmRow] = useState<RowState | null>(null);
 
   const isAdmin = user?.role === "controller" || user?.role === "manager";
+
+  // লাইভ মোট — টাইপ করার সাথে সাথেই আপডেট হয়
+  const totalTaka = rows.reduce((s, r) => s + num(r.mealTaka), 0);
+  const totalChal = rows.reduce(
+    (s, r) => s + r.chalUsed.reduce((a, v) => a + num(v), 0),
+    0
+  );
+  // সকাল/দুপুর/রাত আলাদা করে রিয়েল-টাইম মোট
+  const chalMorning = rows.reduce((s, r) => s + num(r.chalUsed[0]), 0);
+  const chalNoon = rows.reduce((s, r) => s + num(r.chalUsed[1]), 0);
+  const chalNight = rows.reduce((s, r) => s + num(r.chalUsed[2]), 0);
 
   useEffect(() => {
     (async () => {
@@ -126,6 +137,14 @@ export default function DailyPage() {
 
   const save = async (row: RowState, confirmed = false) => {
     if (!monthId) return;
+    // কিছুই লেখা হয়নি? তাহলে আগের ডেটা ভুলে মুছে যাওয়া আটকাও
+    if (
+      row.mealTaka.trim() === "" &&
+      row.chalUsed.every((v) => v.trim() === "")
+    ) {
+      toast.error("মিল টাকা বা চাল — কিছু একটা লিখুন");
+      return;
+    }
     // এই দিনের ডেটা আগেই থাকলে আগে জিজ্ঞেস করবে — নিশ্চিত না বাতিল
     if (row.hasExisting && !confirmed) {
       setConfirmRow(row);
@@ -177,8 +196,24 @@ export default function DailyPage() {
         </label>
       </div>
       <p className="mt-1 text-sm text-neutral-500">
-        মিল খরচ একটা বক্সে, চাল খরচ সকাল/দুপুর/রাত ৩ বক্সে লিখুন।
+        মিল খরচ একটা বক্সে, চাল খরচ সকাল/দুপুর/রাত ৩ বক্সে লিখুন। লেখা সেভ
+        হওয়ার পর বক্স খালি থাকবে — আবার লিখলে নিশ্চিত করতে বলবে।
       </p>
+
+      {/* লাইভ মোট — যত জনের লিখবেন তত জনের হিসাব এখানে দেখাবে */}
+      {rows.length > 0 && (
+        <div className="sticky top-0 z-10 mt-4 grid grid-cols-2 gap-2 rounded-2xl border border-neutral-200 bg-white/95 p-3 backdrop-blur dark:border-neutral-700 dark:bg-neutral-900/95 sm:grid-cols-5">
+          <LiveStat label="মোট টাকা (৳)" value={totalTaka} highlight />
+          <LiveStat label="মোট চাল (পট)" value={totalChal} />
+          <LiveStat label="সকাল (পট)" value={chalMorning} />
+          <LiveStat label="দুপুর (পট)" value={chalNoon} />
+          <LiveStat
+            label="রাত (পট)"
+            value={chalNight}
+            className="col-span-2 sm:col-span-1"
+          />
+        </div>
+      )}
 
       {rows.length === 0 ? (
         <p className="mt-8 text-neutral-500">এই দিনে কোনো এন্ট্রি নেই।</p>
@@ -273,8 +308,7 @@ export default function DailyPage() {
       )}
 
       {/* ওভাররাইট নিশ্চিত করার পপআপ */}
-      {confirmRow && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      {confirmRow && (        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 dark:bg-neutral-900">
             <h2 className="text-lg font-bold">
               {confirmRow.name} — দিন {day}
@@ -300,6 +334,29 @@ export default function DailyPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function LiveStat({
+  label,
+  value,
+  highlight,
+  className,
+}: {
+  label: string;
+  value: number | string;
+  highlight?: boolean;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`rounded-xl bg-neutral-100 px-3 py-2 dark:bg-neutral-800 ${className ?? ""}`}
+    >
+      <p className="text-xs text-neutral-500">{label}</p>
+      <p className={`text-lg font-bold ${highlight ? "text-primary" : ""}`}>
+        {value}
+      </p>
     </div>
   );
 }

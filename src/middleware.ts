@@ -11,8 +11,15 @@ const protectedPrefixes = [
   "/jorimana",
   "/daily",
   "/bazar",
+  "/bazar-list",
+  "/extra",
   "/summary",
   "/members",
+  "/profile",
+  "/notices",
+  "/memories",
+  "/calculator",
+  "/history",
 ];
 
 export function middleware(req: NextRequest) {
@@ -23,7 +30,7 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
-  if (!hasToken && protectedPrefixes.some((p) => pathname.startsWith(p))) {
+  if (!hasToken && protectedPrefixes.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
@@ -40,8 +47,11 @@ export const config = {
     "/jorimana/:path*",
     "/daily/:path*",
     "/bazar/:path*",
+    "/bazar-list/:path*",
+    "/extra/:path*",
     "/summary/:path*",
     "/members/:path*",
+    "/profile/:path*",
     "/notices/:path*",
     "/memories/:path*",
     "/calculator/:path*",

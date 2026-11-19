@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import Input from "@/components/shared/Input";
+import PasswordInput from "@/components/shared/PasswordInput";
 import Button from "@/components/shared/Button";
 import ThemeToggle from "@/components/shared/ThemeToggle";
 import { registerMess } from "@/lib/auth";
@@ -82,10 +83,9 @@ export default function CreateMessPage() {
             onChange={onChange("email")}
             required
           />
-          <Input
+          <PasswordInput
             id="password"
             label="পাসওয়ার্ড"
-            type="password"
             value={form.password}
             onChange={onChange("password")}
             required

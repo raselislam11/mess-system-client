@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import Input from "@/components/shared/Input";
+import PasswordInput from "@/components/shared/PasswordInput";
 import Button from "@/components/shared/Button";
 import ThemeToggle from "@/components/shared/ThemeToggle";
 import { login } from "@/lib/auth";
@@ -55,10 +56,9 @@ export default function LoginPage() {
             onChange={(e) => setForm({ ...form, email: e.target.value })}
             required
           />
-          <Input
+          <PasswordInput
             id="password"
             label="পাসওয়ার্ড"
-            type="password"
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
             required

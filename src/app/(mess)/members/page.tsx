@@ -7,6 +7,7 @@ import { addMember, listMembers, updateMember } from "@/lib/mess";
 import { roleLabel } from "@/lib/permissions";
 import Button from "@/components/shared/Button";
 import Input from "@/components/shared/Input";
+import PasswordInput from "@/components/shared/PasswordInput";
 import type { Member, Role } from "@/types";
 
 export default function MembersPage() {
@@ -99,10 +100,9 @@ export default function MembersPage() {
             onChange={(e) => setEmail(e.target.value)}
             required
           />
-          <Input
+          <PasswordInput
             id="member-password"
             label="পাসওয়ার্ড"
-            type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required

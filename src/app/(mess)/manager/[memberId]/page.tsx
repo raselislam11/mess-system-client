@@ -8,6 +8,7 @@ import {
   deleteDailyEntry,
   getDailyEntries,
   getCurrentMonth,
+  getMonthSummary,
   listMembers,
   listMonths,
   upsertDailyEntry,
@@ -36,6 +37,8 @@ export default function MemberLedgerPage({
   const [months, setMonths] = useState<MonthInfo[]>([]);
   const [monthIndex, setMonthIndex] = useState<number | null>(null);
   const [entries, setEntries] = useState<DailyEntryData[]>([]);
+  // এই সদস্যের এক্সট্রা খরচের ভাগ (মোট এক্সট্রা ÷ সদস্য সংখ্যা)
+  const [extraShare, setExtraShare] = useState({ taka: 0, chal: 0 });
   const [loading, setLoading] = useState(true);
   const [editingDay, setEditingDay] = useState<number | null>(null);
   const [formAmount, setFormAmount] = useState("0");
@@ -47,8 +50,10 @@ export default function MemberLedgerPage({
   const [boxAmount, setBoxAmount] = useState("");
   const [boxNote, setBoxNote] = useState("");
   const [kboxAmount, setKboxAmount] = useState("");
+  const [kboxNote, setKboxNote] = useState("");
   const [kEditingDay, setKEditingDay] = useState<number | null>(null);
   const [kFormAmount, setKFormAmount] = useState("0");
+  const [kFormNote, setKFormNote] = useState("");
   // চালের বক্সসমূহ (জমা + খরচ)
   const [cboxAmount, setCboxAmount] = useState("");
   const [cEditingDay, setCEditingDay] = useState<number | null>(null);
@@ -56,8 +61,10 @@ export default function MemberLedgerPage({
   const [ckMorning, setCkMorning] = useState("");
   const [ckNoon, setCkNoon] = useState("");
   const [ckNight, setCkNight] = useState("");
+  const [ckNote, setCkNote] = useState("");
   const [ckEditingDay, setCkEditingDay] = useState<number | null>(null);
   const [ckForm, setCkForm] = useState<[string, string, string]>(["0", "0", "0"]);
+  const [ckFormNote, setCkFormNote] = useState("");
 
   // কোন সদস্য তা বের করা + মাসের তালিকা
   useEffect(() => {
@@ -102,8 +109,16 @@ export default function MemberLedgerPage({
 
   const load = useCallback(async (monthId: string) => {
     try {
-      const { entries: list } = await getDailyEntries(monthId, undefined, memberId);
+      const [{ entries: list }, summary] = await Promise.all([
+        getDailyEntries(monthId, undefined, memberId),
+        getMonthSummary(monthId),
+      ]);
       setEntries(list);
+      const row = summary.rows.find((r) => r.memberId === memberId);
+      setExtraShare({
+        taka: row?.extraTakaShare ?? 0,
+        chal: row?.extraChalShare ?? 0,
+      });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "লোড হয়নি");
     }
@@ -128,10 +143,16 @@ export default function MemberLedgerPage({
       mealExpense += e.mealTaka[0] + e.mealTaka[1] + e.mealTaka[2];
       if (e.takaGiven > 0) days += 1;
     }
-    return { total, days, mealExpense, remaining: total - mealExpense };
-  }, [entries]);
+    // জমা − মিল খরচ − এক্সট্রা খরচের নিজের ভাগ
+    return {
+      total,
+      days,
+      mealExpense,
+      remaining: total - mealExpense - extraShare.taka,
+    };
+  }, [entries, extraShare.taka]);
 
-  // চালের হিসাব: মোট জমা, মোট খরচ, অবশিষ্ট
+  // চালের হিসাব: মোট জমা, মোট খরচ, অবশিষ্ট (এক্সট্রা ভাগ বিয়োগ করে)
   const chalStats = useMemo(() => {
     let given = 0;
     let used = 0;
@@ -139,8 +160,8 @@ export default function MemberLedgerPage({
       given += e.chalGiven;
       used += e.chalUsed[0] + e.chalUsed[1] + e.chalUsed[2];
     }
-    return { given, used, remaining: given - used };
-  }, [entries]);
+    return { given, used, remaining: given - used - extraShare.chal };
+  }, [entries, extraShare.chal]);
 
   // আজকের চাল খরচের ৩ বক্সের যোগফল (সকাল + দুপুর + রাত)
   const ckTodayTotal = [ckMorning, ckNoon, ckNight].reduce(
@@ -159,7 +180,7 @@ export default function MemberLedgerPage({
   );
   // শুধু যে দিনে মিল খরচ লেখা আছে সেগুলোর বক্স দেখাবে
   const khorochEntries = useMemo(
-    () => entries.filter((e) => khorochOf(e) > 0),
+    () => entries.filter((e) => khorochOf(e) > 0 || e.mealNote),
     [entries]
   );
 
@@ -174,7 +195,7 @@ export default function MemberLedgerPage({
   );
   // শুধু যে দিনে চাল খরচ লেখা আছে সেগুলোর বক্স দেখাবে
   const chalKhorochEntries = useMemo(
-    () => entries.filter((e) => chalUsedOf(e) > 0),
+    () => entries.filter((e) => chalUsedOf(e) > 0 || e.chalNote),
     [entries]
   );
 
@@ -185,12 +206,14 @@ export default function MemberLedgerPage({
     setBoxNote(e?.takaNote ?? "");
     const k = khorochOf(e);
     setKboxAmount(k ? String(k) : "");
+    setKboxNote(e?.mealNote ?? "");
     const c = e?.chalGiven;
     setCboxAmount(c ? String(c) : "");
     const cu = e?.chalUsed ?? [0, 0, 0];
     setCkMorning(cu[0] ? String(cu[0]) : "");
     setCkNoon(cu[1] ? String(cu[1]) : "");
     setCkNight(cu[2] ? String(cu[2]) : "");
+    setCkNote(e?.chalNote ?? "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [byDay, today]);
 
@@ -211,8 +234,10 @@ export default function MemberLedgerPage({
         takaGiven: amount,
         takaNote: boxNote.trim(),
         mealTaka: existing?.mealTaka ?? [0, 0, 0],
+        mealNote: existing?.mealNote ?? "",
         chalGiven: existing?.chalGiven ?? 0,
         chalUsed: existing?.chalUsed ?? [0, 0, 0],
+        chalNote: existing?.chalNote ?? "",
       });
       await load(month.id);
       toast.success("সেভ হয়েছে");
@@ -233,7 +258,7 @@ export default function MemberLedgerPage({
     }
     setSaving(true);
     try {
-      await upsertKhoroch(today, amount);
+      await upsertKhoroch(today, amount, kboxNote.trim());
       await load(month.id);
       toast.success("সেভ হয়েছে");
     } catch (err) {
@@ -244,7 +269,7 @@ export default function MemberLedgerPage({
   };
 
   // যেকোনো দিনের মিল খরচ সেভ/মুছে ফেলা (১টা বক্স → mealTaka[0], বাকি দুটো ০)
-  const upsertKhoroch = async (day: number, amount: number) => {
+  const upsertKhoroch = async (day: number, amount: number, note?: string) => {
     if (!month) return;
     const existing = byDay.get(day);
     await upsertDailyEntry(month.id, {
@@ -253,8 +278,11 @@ export default function MemberLedgerPage({
       takaGiven: existing?.takaGiven ?? 0,
       takaNote: existing?.takaNote ?? "",
       mealTaka: [amount, 0, 0],
+      // নোট পাঠালে হালনাগাদ, না পাঠালে আগেরটাই থাকবে
+      mealNote: note !== undefined ? note : existing?.mealNote ?? "",
       chalGiven: existing?.chalGiven ?? 0,
       chalUsed: existing?.chalUsed ?? [0, 0, 0],
+      chalNote: existing?.chalNote ?? "",
     });
   };
 
@@ -268,7 +296,7 @@ export default function MemberLedgerPage({
         // অন্য কিছু না থাকলে পুরো এন্ট্রিই মুছে দেওয়া যায়
         await deleteDailyEntry(month.id, existing.id);
       } else {
-        await upsertKhoroch(day, 0);
+        await upsertKhoroch(day, 0, "");
       }
       await load(month.id);
       setKEditingDay(null);
@@ -283,6 +311,7 @@ export default function MemberLedgerPage({
   const openKForm = (day: number) => {
     setKEditingDay(day);
     setKFormAmount(String(khorochOf(byDay.get(day))));
+    setKFormNote(byDay.get(day)?.mealNote ?? "");
   };
 
   const saveK = async (day: number) => {
@@ -294,7 +323,7 @@ export default function MemberLedgerPage({
     }
     setSaving(true);
     try {
-      await upsertKhoroch(day, amount);
+      await upsertKhoroch(day, amount, kFormNote.trim());
       await load(month.id);
       setKEditingDay(null);
       toast.success("সেভ হয়েছে");
@@ -324,8 +353,10 @@ export default function MemberLedgerPage({
         takaGiven: Number(formAmount) || 0,
         takaNote: formNote.trim(),
         mealTaka: existing?.mealTaka ?? [0, 0, 0],
+        mealNote: existing?.mealNote ?? "",
         chalGiven: existing?.chalGiven ?? 0,
         chalUsed: existing?.chalUsed ?? [0, 0, 0],
+        chalNote: existing?.chalNote ?? "",
       });
       await load(month.id);
       setEditingDay(null);
@@ -358,8 +389,10 @@ export default function MemberLedgerPage({
           takaGiven: 0,
           takaNote: "",
           mealTaka: existing.mealTaka,
+          mealNote: existing.mealNote,
           chalGiven: existing.chalGiven,
           chalUsed: existing.chalUsed,
+          chalNote: existing.chalNote,
         });
       }
       await load(month.id);
@@ -390,8 +423,10 @@ export default function MemberLedgerPage({
         takaGiven: existing?.takaGiven ?? 0,
         takaNote: existing?.takaNote ?? "",
         mealTaka: existing?.mealTaka ?? [0, 0, 0],
+        mealNote: existing?.mealNote ?? "",
         chalGiven: amount,
         chalUsed: existing?.chalUsed ?? [0, 0, 0],
+        chalNote: existing?.chalNote ?? "",
       });
       await load(month.id);
       toast.success("সেভ হয়েছে");
@@ -414,8 +449,10 @@ export default function MemberLedgerPage({
         takaGiven: existing?.takaGiven ?? 0,
         takaNote: existing?.takaNote ?? "",
         mealTaka: existing?.mealTaka ?? [0, 0, 0],
+        mealNote: existing?.mealNote ?? "",
         chalGiven: Number(cFormAmount) || 0,
         chalUsed: existing?.chalUsed ?? [0, 0, 0],
+        chalNote: existing?.chalNote ?? "",
       });
       await load(month.id);
       setCEditingDay(null);
@@ -453,8 +490,10 @@ export default function MemberLedgerPage({
           takaGiven: existing.takaGiven,
           takaNote: existing.takaNote,
           mealTaka: existing.mealTaka,
+          mealNote: existing.mealNote,
           chalGiven: 0,
           chalUsed: existing.chalUsed,
+          chalNote: existing.chalNote,
         });
       }
       await load(month.id);
@@ -477,7 +516,7 @@ export default function MemberLedgerPage({
     }
     setSaving(true);
     try {
-      await upsertChalKhoroch(today, [values[0], values[1], values[2]]);
+      await upsertChalKhoroch(today, [values[0], values[1], values[2]], ckNote.trim());
       await load(month.id);
       toast.success("সেভ হয়েছে");
     } catch (err) {
@@ -490,7 +529,8 @@ export default function MemberLedgerPage({
   // যেকোনো দিনের চাল খরচ সেভ (সকাল, দুপুর, রাত — ৩টা মান)
   const upsertChalKhoroch = async (
     day: number,
-    values: [number, number, number]
+    values: [number, number, number],
+    note?: string
   ) => {
     if (!month) return;
     const existing = byDay.get(day);
@@ -500,8 +540,11 @@ export default function MemberLedgerPage({
       takaGiven: existing?.takaGiven ?? 0,
       takaNote: existing?.takaNote ?? "",
       mealTaka: existing?.mealTaka ?? [0, 0, 0],
+      mealNote: existing?.mealNote ?? "",
       chalGiven: existing?.chalGiven ?? 0,
       chalUsed: values,
+      // নোট পাঠালে হালনাগাদ, না পাঠালে আগেরটাই থাকবে
+      chalNote: note !== undefined ? note : existing?.chalNote ?? "",
     });
   };
 
@@ -515,7 +558,7 @@ export default function MemberLedgerPage({
         // অন্য কিছু না থাকলে পুরো এন্ট্রিই মুছে দেওয়া যায়
         await deleteDailyEntry(month.id, existing.id);
       } else {
-        await upsertChalKhoroch(day, [0, 0, 0]);
+        await upsertChalKhoroch(day, [0, 0, 0], "");
       }
       await load(month.id);
       setCkEditingDay(null);
@@ -531,6 +574,7 @@ export default function MemberLedgerPage({
     setCkEditingDay(day);
     const cu = byDay.get(day)?.chalUsed ?? [0, 0, 0];
     setCkForm([String(cu[0]), String(cu[1]), String(cu[2])]);
+    setCkFormNote(byDay.get(day)?.chalNote ?? "");
   };
 
   const saveCk = async (day: number) => {
@@ -542,7 +586,7 @@ export default function MemberLedgerPage({
     }
     setSaving(true);
     try {
-      await upsertChalKhoroch(day, [values[0], values[1], values[2]]);
+      await upsertChalKhoroch(day, [values[0], values[1], values[2]], ckFormNote.trim());
       await load(month.id);
       setCkEditingDay(null);
       toast.success("সেভ হয়েছে");
@@ -642,14 +686,20 @@ export default function MemberLedgerPage({
         </div>
 
         {/* হিসাবের কার্ড */}
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <div className="mt-4 grid gap-3 sm:grid-cols-4">
           <StatCard label="মোট টাকা" value={`৳${stats.total}`} highlight />
           <StatCard label="জমা আছে এমন দিন" value={String(stats.days)} />
           <StatCard
             label="কত টাকা আছে"
             value={`৳${stats.remaining}`}
-            sub={`জমা ৳${stats.total} − খরচ ৳${stats.mealExpense}`}
+            sub={`জমা ৳${stats.total} − খরচ ৳${stats.mealExpense} − এক্সট্রা ৳${extraShare.taka}`}
             danger={stats.remaining < 0}
+          />
+          {/* এক্সট্রা খরচ সব সদস্যে ভাগ হয় — এই সদস্যের ভাগ রিয়েল-টাইমে */}
+          <StatCard
+            label="এক্সট্রা খরচের ভাগ"
+            value={`৳${extraShare.taka}`}
+            sub="মোট এক্সট্রা ÷ সদস্য সংখ্যা"
           />
         </div>
       </div>
@@ -769,6 +819,15 @@ export default function MemberLedgerPage({
               >
                 + যোগ
               </button>
+              <input
+                type="text"
+                maxLength={200}
+                aria-label="নোট"
+                placeholder="নোট"
+                value={kboxNote}
+                onChange={(e) => setKboxNote(e.target.value)}
+                className="w-28 input-3d px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900 sm:w-36"
+              />
             </div>
           )}
         </div>
@@ -799,6 +858,15 @@ export default function MemberLedgerPage({
                       onChange={(ev) => setKFormAmount(ev.target.value)}
                       className="w-24 input-3d px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
                     />
+                    <input
+                      type="text"
+                      maxLength={200}
+                      aria-label="নোট"
+                      placeholder="নোট"
+                      value={kFormNote}
+                      onChange={(ev) => setKFormNote(ev.target.value)}
+                      className="min-w-0 flex-1 input-3d px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+                    />
                     <button
                       onClick={() => saveK(e.day)}
                       disabled={saving}
@@ -821,6 +889,11 @@ export default function MemberLedgerPage({
                         {month.label}-{String(e.day).padStart(2, "0")} ·{" "}
                         {weekday(month.label, e.day)}
                       </p>
+                      {e.mealNote && (
+                        <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">
+                          {e.mealNote}
+                        </p>
+                      )}
                     </div>
                     {isAdmin && !monthClosed && (
                       <div className="whitespace-nowrap">
@@ -880,14 +953,20 @@ export default function MemberLedgerPage({
         </div>
 
         {/* চালের হিসাবের কার্ড */}
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <div className="mt-4 grid gap-3 sm:grid-cols-4">
           <StatCard label="মোট চাল (পট)" value={String(chalStats.given)} highlight />
           <StatCard label="চাল খরচ (পট)" value={String(chalStats.used)} />
           <StatCard
             label="অবশিষ্ট চাল (পট)"
             value={String(chalStats.remaining)}
-            sub={`জমা ${chalStats.given} পট − খরচ ${chalStats.used} পট`}
+            sub={`জমা ${chalStats.given} পট − খরচ ${chalStats.used} পট − এক্সট্রা ${extraShare.chal} পট`}
             danger={chalStats.remaining < 0}
+          />
+          {/* এক্সট্রা চাল খরচের এই সদস্যের ভাগ */}
+          <StatCard
+            label="এক্সট্রা চালের ভাগ"
+            value={`${extraShare.chal} পট`}
+            sub="মোট এক্সট্রা ÷ সদস্য সংখ্যা"
           />
         </div>
       </div>
@@ -1008,6 +1087,15 @@ export default function MemberLedgerPage({
               >
                 + যোগ
               </button>
+              <input
+                type="text"
+                maxLength={200}
+                aria-label="নোট"
+                placeholder="নোট"
+                value={ckNote}
+                onChange={(e) => setCkNote(e.target.value)}
+                className="w-28 input-3d px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900 sm:w-36"
+              />
             </div>
           )}
         </div>
@@ -1058,6 +1146,15 @@ export default function MemberLedgerPage({
                     <span className="pb-2 text-lg font-bold">
                       = {ckForm.reduce((s, v) => s + (Number(v) || 0), 0)}
                     </span>
+                    <input
+                      type="text"
+                      maxLength={200}
+                      aria-label="নোট"
+                      placeholder="নোট"
+                      value={ckFormNote}
+                      onChange={(ev) => setCkFormNote(ev.target.value)}
+                      className="min-w-0 flex-1 input-3d px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+                    />
                     <button
                       onClick={() => saveCk(e.day)}
                       disabled={saving}
@@ -1086,6 +1183,11 @@ export default function MemberLedgerPage({
                         সকাল {e.chalUsed[0]} · দুপুর {e.chalUsed[1]} · রাত{" "}
                         {e.chalUsed[2]} = {chalUsedOf(e)}
                       </p>
+                      {e.chalNote && (
+                        <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">
+                          {e.chalNote}
+                        </p>
+                      )}
                     </div>
                     {isAdmin && !monthClosed && (
                       <div className="whitespace-nowrap">

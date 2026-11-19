@@ -28,3 +28,17 @@ export async function logout(): Promise<{ message: string }> {
 export async function getMe(): Promise<{ user: AppUser }> {
   return api("/auth/me");
 }
+
+export interface UpdateProfileInput {
+  oldEmail: string;
+  oldPassword: string;
+  name?: string;
+  newEmail?: string;
+  newPassword?: string;
+}
+
+export async function updateProfile(
+  input: UpdateProfileInput
+): Promise<{ user: AppUser }> {
+  return api("/auth/profile", { method: "PUT", body: input });
+}

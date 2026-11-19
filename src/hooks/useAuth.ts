@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { AppUser } from "@/types";
 import { getMe, logout } from "@/lib/auth";
+import { ApiError } from "@/lib/api";
 
 // Loads the logged-in user from the server (JWT cookie based)
 export function useAuth() {
@@ -13,11 +14,18 @@ export function useAuth() {
     try {
       const { user: me } = await getMe();
       setUser(me);
-    } catch {
-      setUser(null);
-      // Stale/invalid cookie: clear it, otherwise middleware keeps
-      // bouncing /login <-> /dashboard in a redirect loop
-      await logout().catch(() => {});
+    } catch (err) {
+      const status = err instanceof ApiError ? err.status : 0;
+      if (status === 401 || status === 403) {
+        // সত্যিকারের ইনভ্যালিড সেশন — পুরনো কুকি পরিষ্কার করে লগআউট,
+        // নইলে middleware /login <-> /dashboard লুপ বানায়
+        setUser(null);
+        await logout().catch(() => {});
+      } else {
+        // নেটওয়ার্ক/সার্ভার সমস্যা — কুকি মুছবেন না, শুধু ইউজার দেখাবেন না
+        // (পরে রিফ্রেশ করলে আবার চেষ্টা হবে)
+        setUser(null);
+      }
     } finally {
       setLoading(false);
     }

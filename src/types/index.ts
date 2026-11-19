@@ -38,8 +38,10 @@ export interface DailyEntryData {
   takaGiven: number;
   takaNote: string;
   mealTaka: number[];
+  mealNote: string;
   chalGiven: number;
   chalUsed: number[];
+  chalNote: string;
 }
 
 export interface BazarEntryData {
@@ -47,6 +49,22 @@ export interface BazarEntryData {
   day: number;
   amount: number;
   note: string;
+}
+
+export interface BazarListData {
+  id: string;
+  day: number;
+  members: { id: string; name: string }[];
+  amount: number;
+  done: boolean;
+}
+
+export interface JorimanaData {
+  id: string;
+  day: number;
+  member: { id: string; name: string } | null;
+  amount: number;
+  done: boolean;
 }
 
 export interface ExtraEntryData {
@@ -65,6 +83,11 @@ export interface SummaryRow {
   mealTakaTotal: number;
   chalGiven: number;
   chalUsedTotal: number;
+  extraTakaShare: number;
+  extraChalShare: number;
+  // আগের সব মাস থেকে ক্যারি হওয়া জমা
+  carryOverTaka: number;
+  carryOverChal: number;
   messBillPaid: boolean;
   messBillAmount: number;
   auntyBillPaid: boolean;
@@ -80,7 +103,17 @@ export interface MonthSummary {
     chalGiven: number;
     chalUsed: number;
     takaGiven: number;
+    mealTaka: number;
     balance: number;
+    chalBalance: number;
+  };
+  carryOver: {
+    managerTaka: number;
+    managerChal: number;
+  };
+  grandTotals: {
+    managerTaka: number;
+    managerChal: number;
   };
   suggestedMessShare: number;
   rows: SummaryRow[];

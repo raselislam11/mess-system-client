@@ -1,49 +1,45 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { getCurrentMonth, getMonthSummary } from "@/lib/mess";
 import { roleLabel } from "@/lib/permissions";
 import type { MonthSummary } from "@/types";
 
+const POLL_MS = 20000; // সার্ভার থেকে ২০ সেকেন্ড পরপর হিসাব রিফ্রেশ
+
 export default function DashboardPage() {
   const { user } = useAuth();
   const [summary, setSummary] = useState<MonthSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    (async () => {
-      try {
-        const { month } = await getCurrentMonth();
-        const data = await getMonthSummary(month.id);
-        setSummary(data);
-      } catch (err) {
-        if (!controller.signal.aborted) {
-          toast.error(
-            err instanceof Error ? err.message : "হিসাব লোড হয়নি"
-          );
-        }
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
+  const load = useCallback(async (silent = false) => {
+    try {
+      const { month } = await getCurrentMonth();
+      const data = await getMonthSummary(month.id);
+      setSummary(data);
+    } catch (err) {
+      if (!silent) {
+        toast.error(err instanceof Error ? err.message : "হিসাব লোড হয়নি");
       }
-    })();
-    return () => controller.abort();
+      setSummary(null);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const cards = summary
-    ? [
-        { label: "সদস্যদের টাকা", value: summary.totals.takaGiven + summary.totals.extraTaka },
-        { label: "বাজার খরচ", value: summary.totals.bazar },
-        {
-          label: "থাকা/জমা",
-          value: summary.totals.balance,
-        },
-        { label: "চাল (কেজি)", value: summary.totals.chalGiven + summary.totals.extraChal },
-      ]
-    : [];
+  useEffect(() => {
+    void load();
+    // রিয়েল-টাইম: অন্য কেউ হিসাব বদলালে নিজে থেকেই আপডেট দেখা যায়
+    const timer = setInterval(() => void load(true), POLL_MS);
+    const onFocus = () => void load(true);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [load]);
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -53,11 +49,11 @@ export default function DashboardPage() {
       </p>
 
       {loading ? (
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => (
+        <div className="mt-8 grid gap-4 sm:grid-cols-2">
+          {[...Array(2)].map((_, i) => (
             <div
               key={i}
-              className="h-24 animate-pulse rounded-2xl bg-neutral-200 dark:bg-neutral-800"
+              className="h-28 animate-pulse rounded-2xl bg-neutral-200 dark:bg-neutral-800"
             />
           ))}
         </div>
@@ -66,30 +62,63 @@ export default function DashboardPage() {
           <p className="mt-4 text-sm text-neutral-500">
             চলতি মাস: <span className="font-medium">{summary.month.label}</span>
           </p>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {cards.map((card) => (
-              <div
-                key={card.label}
-                className="card-3d p-4"
-              >
-                <p className="text-sm text-neutral-500">{card.label}</p>
-                <p className="mt-1 text-xl font-bold">{card.value}</p>
-              </div>
-            ))}
-          </div>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link
-              href="/daily"
-              className="btn-3d px-4 py-2 text-sm"
-            >
-              দৈনিক হিসাব লিখুন
-            </Link>
-            <Link
-              href="/summary"
-              className="btn-press rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-            >
-              মাসিক হিসাব দেখুন
-            </Link>
+          {/* ড্যাশবোর্ডে ম্যানেজারের কাছে মোট টাকা ও চাল — আগের সব মাস সহ */}
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div className="card-3d p-5">
+              <p className="text-sm text-neutral-500">
+                ম্যানেজারের কাছে টাকা
+              </p>
+              {(() => {
+                const managerTaka =
+                  summary.grandTotals?.managerTaka ?? summary.totals.balance;
+                return (
+                  <>
+                    <p
+                      className={`mt-2 text-3xl font-bold ${
+                        managerTaka < 0 ? "text-red-500" : "text-primary"
+                      }`}
+                    >
+                      {managerTaka < 0 ? "−" : ""}৳{Math.abs(managerTaka)}
+                    </p>
+                    <p className="mt-1 text-xs text-neutral-400">
+                      {managerTaka < 0 ? "দেনা" : "জমা"} — আগের সব মাস সহ
+                    </p>
+                    <p className="mt-1 text-xs text-neutral-500">
+                      এই মাসে:{" "}
+                      {summary.totals.balance < 0 ? "−" : ""}৳
+                      {Math.abs(summary.totals.balance)}
+                    </p>
+                  </>
+                );
+              })()}
+            </div>
+            <div className="card-3d p-5">
+              <p className="text-sm text-neutral-500">
+                ম্যানেজারের কাছে চাল (পট)
+              </p>
+              {(() => {
+                const managerChal =
+                  summary.grandTotals?.managerChal ?? summary.totals.chalBalance;
+                return (
+                  <>
+                    <p
+                      className={`mt-2 text-3xl font-bold ${
+                        managerChal < 0 ? "text-red-500" : "text-primary"
+                      }`}
+                    >
+                      {managerChal < 0 ? "−" : ""}
+                      {Math.abs(managerChal)} পট
+                    </p>
+                    <p className="mt-1 text-xs text-neutral-400">
+                      {managerChal < 0 ? "দেনা" : "জমা"} — আগের সব মাস সহ
+                    </p>
+                    <p className="mt-1 text-xs text-neutral-500">
+                      এই মাসে: {summary.totals.chalBalance} পট
+                    </p>
+                  </>
+                );
+              })()}
+            </div>
           </div>
         </>
       ) : (
